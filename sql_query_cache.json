@@ -1,0 +1,26 @@
+{
+  "665f32382b7c3b8e35a834c4800b3cbd": {
+    "question_template": "donne moi le nombre des eleves inscrits pour {AnneeScolaire}",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves_inscrits\nFROM inscriptioneleve ie\nJOIN anneescolaire a ON ie.AnneeScolaire = a.id\nWHERE a.AnneeScolaire = '{AnneeScolaire}'\nAND ie.Annuler = 0;"
+  },
+  "4961a4ea2276d61061c503d59a5cd499": {
+    "question_template": "donne moi l emploi du temps de la classe {CODECLASSEFR} pour {libelleJourFr} {idSemaine}",
+    "sql_template": "SELECT \n    p.NomFr AS nom_enseignant,\n    p.PrenomFr AS prenom_enseignant,\n    m.NomMatiereFr AS matiere,\n    s.nomSalleFr AS salle,\n    s_debut.debut AS debut_seance,\n    s_fin.fin AS fin_seance,\n    g.libelleGroupe AS groupe\nFROM \n    emploidutemps e\nJOIN \n    jour j ON e.Jour = j.id AND j.libelleJourFr = 'Mercredi'\nJOIN \n    classe c ON e.Classe = c.id AND c.CODECLASSEFR = '{CODECLASSEFR}'\nJOIN \n    semaine sm ON e.Semaine = sm.id AND sm.id = 1\nJOIN \n    enseingant en ON e.Enseignant = en.id\nJOIN \n    personne p ON en.idPersonne = p.id\nJOIN \n    matiere m ON e.Matiere = m.id\nJOIN \n    salle s ON e.Salle = s.id\nJOIN \n    seance s_debut ON e.SeanceDebut = s_debut.id\nJOIN \n    seance s_fin ON e.SeanceFin = s_fin.id\nLEFT JOIN \n    groupe g ON e.Groupe = g.id;"
+  },
+  "945cd20e9f90098ec228e59a6149ecea": {
+    "question_template": "donne moi les coordonées de l'eleve {NomFr} {PrenomFr}",
+    "sql_template": "SELECT \n    p.NomFr, \n    p.PrenomFr, \n    p.AdresseFr, \n    p.AdresseAr, \n    p.Tel1, \n    p.Tel2, \n    p.Cin\nFROM \n    personne p\nJOIN \n    eleve e ON p.id = e.IdPersonne\nWHERE \n    p.NomFr = {NomFr} \n    AND p.PrenomFr = {PrenomFr};"
+  },
+  "668da3bbf0c395e608f9db6b2cd6f6fb": {
+    "question_template": "donne moi le nombre des eleves non réinscrits ",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves_non_reinscrits\nFROM eleve e\nWHERE e.id NOT IN (\n    SELECT ie.Eleve\n    FROM inscriptioneleve ie\n    JOIN anneescolaire a ON ie.AnneeScolaire = a.id\n    WHERE a.AnneeScolaire = CONCAT(YEAR(CURDATE()), '/', YEAR(CURDATE())+1)\n)\nAND e.id IN (\n    SELECT ie2.Eleve\n    FROM inscriptioneleve ie2\n    JOIN anneescolaire a2 ON ie2.AnneeScolaire = a2.id\n    WHERE a2.AnneeScolaire = CONCAT(YEAR(CURDATE())-1, '/', YEAR(CURDATE()))\n);"
+  },
+  "dbe4c17e31ffebe7e339ce46d5c38136": {
+    "question_template": "donne moi le nombre des eleves non réinscrits pour l'année scolaire {AnneeScolaire}",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves_non_reinscrits\nFROM eleve e\nWHERE e.id NOT IN (\n    SELECT ie.Eleve\n    FROM inscriptioneleve ie\n    JOIN anneescolaire a ON ie.AnneeScolaire = a.id\n    WHERE a.AnneeScolaire = {AnneeScolaire}\n)\nAND e.id IN (\n    SELECT ie2.Eleve\n    FROM inscriptioneleve ie2\n    JOIN anneescolaire a2 ON ie2.AnneeScolaire = a2.id\n    WHERE a2.AnneeScolaire = '2024/2025'\n);"
+  },
+  "fdb5d729f8c7dbf799af14248d911445": {
+    "question_template": "donne moi les notes par matière de l'eleve {NomFr} {PrenomFr} pour la {codeperiexam} ",
+    "sql_template": "SELECT em.libematifr AS matiere, ed.moyemati AS moyenne, ex.codeperiexam AS codeTrimestre \nFROM Eduperiexam ex, Edumoymaticopie ed, Edumatiere em, Eleve e, personne p\nWHERE e.idedusrv = ed.idenelev \nAND ed.codemati = em.codemati \nAND ex.codeperiexam = ed.codeperiexam  \nAND e.Idpersonne = p.id \nAND p.NomFr = {NomFr} \nAND p.PrenomFr = {PrenomFr} \nAND ed.moyemati NOT LIKE '0.00' \nAND ed.codeperiexam = {codeperiexam};"
+  }
+}

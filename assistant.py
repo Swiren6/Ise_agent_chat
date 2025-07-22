@@ -9,6 +9,7 @@ import json
 from template_matcher.matcher import SemanticTemplateMatcher
 import re
 from pathlib import Path
+from cache_manager import CacheManager
 
 PROMPT_TEMPLATE = PromptTemplate(
     input_variables=["input", "table_info", "relevant_domain_descriptions", "relations"],
@@ -97,7 +98,7 @@ class SQLAssistant:
         self.domain_descriptions = self.load_domain_descriptions()
         self.domain_to_tables_mapping = self.load_domain_to_tables_mapping()
         self.ask_llm = ask_llm
-        
+        self.cache =CacheManager()
         # Initialisation du matcher
         self.template_matcher = SemanticTemplateMatcher()
         
@@ -189,6 +190,7 @@ class SQLAssistant:
             requete = requete.replace(f'{{{var_name}}}', clean_value)
         
         return requete
+    
     def load_domain_descriptions(self) -> tuple[Dict[str, str], Dict[str, List[str]]]:
         with open('prompts/domain_descriptions.json') as f:
             return json.load(f)
@@ -196,6 +198,7 @@ class SQLAssistant:
     def load_relations(self) -> str:
         with open("prompts/relations.txt", "r") as f:
             return f.read()
+        
     def load_domain_to_tables_mapping(self) ->str:
         with open("prompts/domain_tables_mapping.json", "r") as f:
             return json.load(f)
@@ -232,9 +235,26 @@ class SQLAssistant:
         for domain in domains:
             tables.extend(domain_to_tables_map.get(domain, []))
         return sorted(list(set(tables)))
+    
     def ask_question(self, question: str) -> tuple[str, str]:
-        template_match = self.find_matching_template(question)
+        # 1. Vérifier le cache avec la nouvelle approche
+        cached = self.cache.get_cached_query(question)
+        if cached:
+            sql_template, variables = cached
+            # Remplacer les placeholders dans la requête SQL
+            sql_query = sql_template
+            for column, value in variables.items():
+                sql_query = sql_query.replace(f"{{{column}}}", value)
+            
+            print("⚡ Requête récupérée depuis le cache")
+            try:
+                result = self.db.run(sql_query)
+                return sql_query, self.format_result(result, question)
+            except Exception as db_error:
+                return sql_query, f"❌ Erreur d'exécution SQL : {str(db_error)}"
         
+        # 2. Vérifier les templates prédéfinis
+        template_match = self.find_matching_template(question)
         if template_match:
             print("🔍 Question correspond à un template pré-enregistré")
             sql_query = self.generate_query_from_template(
@@ -242,17 +262,17 @@ class SQLAssistant:
                 template_match["variables"]
             )
             print(f"⚡ Requête générée à partir du template: {sql_query}")
-            
             try:
                 result = self.db.run(sql_query)
-                print(f"⚡ Résultat brut de la base de données:\n{result}")
-                return sql_query, self.format_result(result, question)
+                formatted_result = self.format_result(result, question)
+                # Mise en cache avec la nouvelle méthode
+                self.cache.cache_query(question, sql_query)
+                return sql_query, formatted_result
             except Exception as db_error:
                 return sql_query, f"❌ Erreur d'exécution SQL : {str(db_error)}"
         
+        # 3. Génération via LLM
         print("🔍 Aucun template trouvé, utilisation du LLM")
-        
-        # Génération du prompt
         prompt = PROMPT_TEMPLATE.format(
             input=question,
             table_info=self.db.get_table_info(),
@@ -260,7 +280,6 @@ class SQLAssistant:
             relations=self.relations_description
         )
 
-        # Génération de la requête SQL via LLM
         sql_query = self.ask_llm(prompt)
         if not sql_query:
             return "", "❌ La requête générée est vide."
@@ -268,14 +287,15 @@ class SQLAssistant:
         sql_query = sql_query.strip()
         print(f"🔍 Requête générée: {sql_query}")
 
-        # Exécution de la requête
         try:
             result = self.db.run(sql_query)
-            print(f"⚡ Résultat brut de la base de données:\n{result}")
-            return sql_query, self.format_result(result, question)
+            formatted_result = self.format_result(result, question)
+            # Mise en cache avec la nouvelle méthode
+            self.cache.cache_query(question, sql_query)
+            return sql_query, formatted_result
         except Exception as db_error:
             return sql_query, f"❌ Erreur d'exécution SQL : {str(db_error)}"
-
+        
     def format_result(self, result: str, question: str = "") -> str:
         """
         Formate les résultats SQL bruts en une table lisible

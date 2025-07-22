@@ -50,7 +50,7 @@ class SemanticTemplateMatcher:
         # Garde uniquement le texte significatif
         return ' '.join([word for word in text.split() if len(word) > 1])
     
-    def find_similar_template(self, question: str, threshold: float = 0.7) -> Tuple[Optional[Dict], float]:
+    def find_similar_template(self, question: str, threshold: float = 0.8) -> Tuple[Optional[Dict], float]:
         """
         Trouve le template le plus similaire à la question
         Args:
