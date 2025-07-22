@@ -1,0 +1,10 @@
+{
+  "questions": [
+    {
+      "template_question": "Quelle est le nombre des nouvelles inscriptions pour l'année scolaire {AnneeScolaire} ?",
+      "requete_template": "SELECT niveau.id AS id, classe.id AS IdClasse, classe.CODECLASSEFR AS Classe, COUNT(*) AS Eleve FROM inscriptioneleve JOIN classe ON inscriptioneleve.Classe = classe.id JOIN niveau ON classe.IDNIV = niveau.id WHERE inscriptioneleve.AnneeScolaire = '{AnneeScolaire}' AND inscriptioneleve.TypeInscri = 'N' AND inscriptioneleve.annuler = 0 GROUP BY classe.CODECLASSEFR, classe.id, niveau.id ORDER BY niveau.id;",
+      "variables": ["AnneeScolaire"],
+      "description": "Retourne le nombre des nouvelles inscriptions pour une année scolaire spécifique"
+    }
+  ]
+}
