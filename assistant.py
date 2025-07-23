@@ -246,7 +246,7 @@ class SQLAssistant:
             for column, value in variables.items():
                 sql_query = sql_query.replace(f"{{{column}}}", value)
             
-            print("⚡ Requête récupérée depuis le cache")
+            print("⚡ Requête récupérée depuis le cache (similarité sémantique)")
             try:
                 result = self.db.run(sql_query)
                 return sql_query, self.format_result(result, question)
@@ -290,7 +290,6 @@ class SQLAssistant:
         try:
             result = self.db.run(sql_query)
             formatted_result = self.format_result(result, question)
-            # Mise en cache avec la nouvelle méthode
             self.cache.cache_query(question, sql_query)
             return sql_query, formatted_result
         except Exception as db_error:

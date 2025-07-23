@@ -1,26 +1,26 @@
 {
-  "665f32382b7c3b8e35a834c4800b3cbd": {
-    "question_template": "donne moi le nombre des eleves inscrits pour {AnneeScolaire}",
-    "sql_template": "SELECT COUNT(*) AS nombre_eleves_inscrits\nFROM inscriptioneleve ie\nJOIN anneescolaire a ON ie.AnneeScolaire = a.id\nWHERE a.AnneeScolaire = '{AnneeScolaire}'\nAND ie.Annuler = 0;"
-  },
-  "4961a4ea2276d61061c503d59a5cd499": {
-    "question_template": "donne moi l emploi du temps de la classe {CODECLASSEFR} pour {libelleJourFr} {idSemaine}",
-    "sql_template": "SELECT \n    p.NomFr AS nom_enseignant,\n    p.PrenomFr AS prenom_enseignant,\n    m.NomMatiereFr AS matiere,\n    s.nomSalleFr AS salle,\n    s_debut.debut AS debut_seance,\n    s_fin.fin AS fin_seance,\n    g.libelleGroupe AS groupe\nFROM \n    emploidutemps e\nJOIN \n    jour j ON e.Jour = j.id AND j.libelleJourFr = 'Mercredi'\nJOIN \n    classe c ON e.Classe = c.id AND c.CODECLASSEFR = '{CODECLASSEFR}'\nJOIN \n    semaine sm ON e.Semaine = sm.id AND sm.id = 1\nJOIN \n    enseingant en ON e.Enseignant = en.id\nJOIN \n    personne p ON en.idPersonne = p.id\nJOIN \n    matiere m ON e.Matiere = m.id\nJOIN \n    salle s ON e.Salle = s.id\nJOIN \n    seance s_debut ON e.SeanceDebut = s_debut.id\nJOIN \n    seance s_fin ON e.SeanceFin = s_fin.id\nLEFT JOIN \n    groupe g ON e.Groupe = g.id;"
-  },
   "945cd20e9f90098ec228e59a6149ecea": {
     "question_template": "donne moi les coordonées de l'eleve {NomFr} {PrenomFr}",
-    "sql_template": "SELECT \n    p.NomFr, \n    p.PrenomFr, \n    p.AdresseFr, \n    p.AdresseAr, \n    p.Tel1, \n    p.Tel2, \n    p.Cin\nFROM \n    personne p\nJOIN \n    eleve e ON p.id = e.IdPersonne\nWHERE \n    p.NomFr = {NomFr} \n    AND p.PrenomFr = {PrenomFr};"
+    "sql_template": "SELECT p.NomFr, p.PrenomFr, p.NomAr, p.PrenomAr, p.Cin, p.AdresseFr, p.AdresseAr, p.Tel1, p.Tel2, p.Nationalite, p.Localite, p.Civilite\nFROM personne p\nJOIN eleve e ON p.id = e.IdPersonne\nWHERE CONCAT(p.NomFr, ' ', p.PrenomFr) = '{NomFr} {PrenomFr}' OR CONCAT(p.NomAr, ' ', p.PrenomAr) = '{NomFr} {PrenomFr}';"
   },
-  "668da3bbf0c395e608f9db6b2cd6f6fb": {
-    "question_template": "donne moi le nombre des eleves non réinscrits ",
-    "sql_template": "SELECT COUNT(*) AS nombre_eleves_non_reinscrits\nFROM eleve e\nWHERE e.id NOT IN (\n    SELECT ie.Eleve\n    FROM inscriptioneleve ie\n    JOIN anneescolaire a ON ie.AnneeScolaire = a.id\n    WHERE a.AnneeScolaire = CONCAT(YEAR(CURDATE()), '/', YEAR(CURDATE())+1)\n)\nAND e.id IN (\n    SELECT ie2.Eleve\n    FROM inscriptioneleve ie2\n    JOIN anneescolaire a2 ON ie2.AnneeScolaire = a2.id\n    WHERE a2.AnneeScolaire = CONCAT(YEAR(CURDATE())-1, '/', YEAR(CURDATE()))\n);"
+  "665f32382b7c3b8e35a834c4800b3cbd": {
+    "question_template": "donne moi le nombre des eleves inscrits pour {AnneeScolaire}",
+    "sql_template": "SELECT COUNT(*) AS nombre_eleves_inscrits\nFROM inscriptioneleve ie\nJOIN anneescolaire a ON ie.AnneeScolaire = a.id\nWHERE a.AnneeScolaire = '{AnneeScolaire}';"
   },
-  "dbe4c17e31ffebe7e339ce46d5c38136": {
-    "question_template": "donne moi le nombre des eleves non réinscrits pour l'année scolaire {AnneeScolaire}",
-    "sql_template": "SELECT COUNT(*) AS nombre_eleves_non_reinscrits\nFROM eleve e\nWHERE e.id NOT IN (\n    SELECT ie.Eleve\n    FROM inscriptioneleve ie\n    JOIN anneescolaire a ON ie.AnneeScolaire = a.id\n    WHERE a.AnneeScolaire = {AnneeScolaire}\n)\nAND e.id IN (\n    SELECT ie2.Eleve\n    FROM inscriptioneleve ie2\n    JOIN anneescolaire a2 ON ie2.AnneeScolaire = a2.id\n    WHERE a2.AnneeScolaire = '2024/2025'\n);"
+  "df08768a9c9712f45be30070d3c553af": {
+    "question_template": "donne moi les dates et les durée et les matieres de retards effectué par l eleve {NomFr} {PrenomFr} ",
+    "sql_template": "SELECT r.`Date`, r.`Duree`, m.`NomMatiereFr` AS matiere\nFROM retard r\nJOIN inscriptioneleve ie ON r.`Inscription` = ie.id\nJOIN eleve e ON ie.`Eleve` = e.id\nJOIN personne p ON e.`IdPersonne` = p.id\nJOIN matiere m ON r.`Matiere` = m.id\nWHERE p.`NomFr` = {NomFr} AND p.`PrenomFr` = {PrenomFr};"
   },
-  "fdb5d729f8c7dbf799af14248d911445": {
-    "question_template": "donne moi les notes par matière de l'eleve {NomFr} {PrenomFr} pour la {codeperiexam} ",
-    "sql_template": "SELECT em.libematifr AS matiere, ed.moyemati AS moyenne, ex.codeperiexam AS codeTrimestre \nFROM Eduperiexam ex, Edumoymaticopie ed, Edumatiere em, Eleve e, personne p\nWHERE e.idedusrv = ed.idenelev \nAND ed.codemati = em.codemati \nAND ex.codeperiexam = ed.codeperiexam  \nAND e.Idpersonne = p.id \nAND p.NomFr = {NomFr} \nAND p.PrenomFr = {PrenomFr} \nAND ed.moyemati NOT LIKE '0.00' \nAND ed.codeperiexam = {codeperiexam};"
+  "a2489ec8e37a9c028ba82912f1b21244": {
+    "question_template": "donne moi les retards effectué par l eleve {NomFr} {PrenomFr} ",
+    "sql_template": "SELECT r.id, r.Date, r.Heure, r.Duree, r.Definition, m.NomMatiereFr AS Matiere, \n       CONCAT(p.NomFr, ' ', p.PrenomFr) AS Enseignant, c.CODECLASSEFR AS Classe\nFROM retard r\nJOIN inscriptioneleve ie ON r.Inscription = ie.id\nJOIN eleve e ON ie.Eleve = e.id\nJOIN personne p_eleve ON e.IdPersonne = p_eleve.id\nJOIN matiere m ON r.Matiere = m.id\nJOIN enseingant en ON r.Enseignant = en.id\nJOIN personne p ON en.idPersonne = p.id\nJOIN classe c ON r.Classe = c.id\nWHERE p_eleve.NomFr = {NomFr} AND p_eleve.PrenomFr = {PrenomFr};"
+  },
+  "cc5558171c0d108e81594523cc9c6f44": {
+    "question_template": "donne moi les notes de la {codeperiexam} de l' eleve d id {IDPersonne} par matieres",
+    "sql_template": "SELECT em.libematifr AS matiere, ed.moyemati AS moyenne, ex.codeperiexam AS codeTrimestre \nFROM Edumoymaticopie ed\nJOIN Edumatiere em ON ed.codemati = em.codemati\nJOIN Eduperiexam ex ON ex.codeperiexam = ed.codeperiexam\nJOIN Eleve e ON e.idedusrv = ed.idenelev\nWHERE e.Idpersonne = {IDPersonne} \nAND ed.moyemati NOT LIKE '0.00' \nAND ed.codeperiexam = {codeperiexam};"
+  },
+  "56f0bfd5c9dee678892703962b9e8689": {
+    "question_template": "donne moi le nombre  des absences effectuée par eleve {NomFr} {PrenomFr}  par matières pendant l'année {AnneeScolaire}",
+    "sql_template": "SELECT \n    m.NomMatiereFr AS matiere,\n    COUNT(a.id) AS nombre_absences\nFROM \n    absence a\nJOIN \n    inscriptioneleve ie ON a.Inscription = ie.id\nJOIN \n    eleve e ON ie.Eleve = e.id\nJOIN \n    personne p ON e.IdPersonne = p.id\nJOIN \n    matiere m ON a.Matiere = m.id\nJOIN \n    anneescolaire an ON a.anneeSco = an.id\nWHERE \n    CONCAT(p.NomFr, ' ', p.PrenomFr) = '{NomFr} {PrenomFr}'\n    AND an.AnneeScolaire = '{AnneeScolaire}'\nGROUP BY \n    m.NomMatiereFr;"
   }
 }

@@ -25,7 +25,7 @@ class SemanticTemplateMatcher:
                 continue
                 
             normalized = self._normalize_template(t["template_question"])
-            if normalized.strip():  # Ignore les textes vides après normalisation
+            if normalized.strip():  
                 valid_templates.append(t)
                 template_texts.append(normalized)
         
@@ -51,14 +51,6 @@ class SemanticTemplateMatcher:
         return ' '.join([word for word in text.split() if len(word) > 1])
     
     def find_similar_template(self, question: str, threshold: float = 0.8) -> Tuple[Optional[Dict], float]:
-        """
-        Trouve le template le plus similaire à la question
-        Args:
-            question: La question à comparer
-            threshold: Le seuil de similarité minimum
-        Returns:
-            Un tuple (template, score) ou (None, 0) si aucun template ne dépasse le seuil
-        """
         if not self.templates:
             return None, 0.0
             

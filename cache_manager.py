@@ -1,9 +1,12 @@
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 import hashlib
 import re
 from collections import defaultdict
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 class CacheManager:
     def __init__(self, cache_file: str = "sql_query_cache.json"):
@@ -14,7 +17,8 @@ class CacheManager:
         self.auto_patterns = {
             r'\b([A-Z]{3,})\s+([A-Z]{3,})\b': 'NomPrenom',
             r'\b\d+[A-Z]\d+\b': 'CODECLASSEFR', 
-            r'\b(20\d{2}[/-]20\d{2})\b': 'AnneeScolaire',  
+            r'\b(20\d{2}[/-]20\d{2})\b': 'AnneeScolaire',
+            r'\b\d{1,5}\b': 'IDPersonne' 
         }
         self.trimestre_mapping = {
             '1er trimestre': 31,
@@ -30,6 +34,19 @@ class CacheManager:
             'trimestre 3': 33
         }
         self.discovered_patterns = defaultdict(list)
+        
+        # Initialisation du vectorizer TF-IDF
+        self.vectorizer = TfidfVectorizer()
+        self.template_vectors = None
+        self._init_similarity_search()
+
+    def _init_similarity_search(self):
+        """Initialise le système de recherche de similarité"""
+        if self.cache:
+            templates = [self._normalize_template(item['question_template']) 
+                        for item in self.cache.values()]
+            self.vectorizer.fit(templates)
+            self.template_vectors = self.vectorizer.transform(templates)
 
     def _load_cache(self) -> Dict[str, Any]:
         if not self.cache_file.exists():
@@ -43,6 +60,7 @@ class CacheManager:
     def _save_cache(self):
         with open(self.cache_file, 'w', encoding='utf-8') as f:
             json.dump(self.cache, f, indent=2, ensure_ascii=False)
+        self._init_similarity_search()  # Recharge les vecteurs après sauvegarde
 
     def _extract_parameters(self, text: str) -> Tuple[str, Dict[str, str]]:
         """Détection intelligente des paramètres"""
@@ -54,10 +72,11 @@ class CacheManager:
                 normalized = normalized.replace(term, "{codeperiexam}")
                 variables["codeperiexam"] = str(code)
                 break
+                
         # 1. Détection des motifs connus
         for pattern, param_type in self.auto_patterns.items():
             matches = list(re.finditer(pattern, normalized))
-            for match in reversed(matches):  # Traiter de droite à gauche pour éviter les problèmes d'index
+            for match in reversed(matches):  # Traiter de droite à gauche
                 full_match = match.group(0)
                 
                 if param_type == 'NomPrenom':
@@ -69,7 +88,7 @@ class CacheManager:
                     normalized = normalized.replace(full_match, f"{{{param_type}}}")
                     variables[param_type] = value
 
-        # 2. Détection des valeurs entre quotes non encore traitées
+        # 2. Détection des valeurs entre quotes
         quoted_values = re.findall(r"['\"]([^'\"]+)['\"]", normalized)
         for val in quoted_values:
             if val not in variables.values():  # Pas déjà traité
@@ -79,68 +98,70 @@ class CacheManager:
                     variables[param_name] = val
 
         return normalized, variables
-    
-    def _replace_matches(self, text: str, pattern: str, param_name: str) -> Tuple[str, str]:
-        """Remplace les occurences et retourne la valeur trouvée"""
-        matches = re.finditer(pattern, text)
-        value = None
-        for match in matches:
-            value = match.group(1) if len(match.groups()) > 0 else match.group(0)
-            text = text.replace(value, f"{{{param_name}}}")
-        return text, value
-    
-    def _infer_parameter_name(self, value: str, context: str) -> str:
-        """Infère le nom du paramètre basé sur le contexte"""
-        if value.isdigit():
-            return "ID"
+
+    def _normalize_template(self, text: str) -> str:
+        """Normalise le texte pour la comparaison de similarité"""
+        normalized, _ = self._extract_parameters(text)
+        # Supprime les espaces multiples et les caractères spéciaux
+        normalized = re.sub(r'\s+', ' ', normalized).lower().strip()
+        return normalized
+
+    def find_similar_template(self, question: str, threshold: float = 0.84) -> Tuple[Optional[Dict], float]:
+        """Trouve un template similaire en utilisant TF-IDF et cosine similarity"""
+        if not self.cache:
+            return None, 0.0
+            
+        norm_question = self._normalize_template(question)
         
-        # Analyse le contexte pour deviner le type de paramètre
-        if "nom" in context.lower():
-            return "NomFr" if value.isupper() else "Nom"
-        elif "prenom" in context.lower():
-            return "PrenomFr"
-        elif "matiere" in context.lower():
-            return "Matiere"
-        elif "salle" in context.lower():
-            return "Salle"
+        try:
+            question_vec = self.vectorizer.transform([norm_question])
+            similarities = cosine_similarity(question_vec, self.template_vectors)[0]
+            best_idx = np.argmax(similarities)
+            best_score = similarities[best_idx]
+            
+            if best_score >= threshold:
+                cache_key = list(self.cache.keys())[best_idx]
+                return self.cache[cache_key], best_score
+        except Exception as e:
+            print(f"⚠️ Erreur lors de la recherche de template similaire: {str(e)}")
         
-        # Enregistre le nouveau motif pour usage futur
-        pattern = re.escape(value)
-        self.discovered_patterns[pattern].append(context)
-        return "VALUE"
-    
+        return None, 0.0
+
     def _generate_cache_key(self, question: str) -> str:
         """Génère une clé basée sur la question normalisée"""
-        normalized_question, _ = self._extract_parameters(question)  # Utilise la nouvelle méthode
+        normalized_question, _ = self._extract_parameters(question)
         return hashlib.md5(normalized_question.encode('utf-8')).hexdigest()
 
     def _normalize_question(self, question: str) -> Tuple[str, Dict[str, str]]:
-        """Alternative à extract_parameters pour une compatibilité ascendante"""
-        return self._extract_parameters(question)  # Délègue à la nouvelle méthode
+        """Alternative à extract_parameters pour compatibilité"""
+        return self._extract_parameters(question)
 
     def _normalize_sql(self, sql: str, variables: Dict[str, str]) -> str:
         """Normalisation SQL avancée"""
-        # Protection des mots-clés SQL
-        keywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'AND', 'OR']
-        protected = []
-        
+        if "AnneeScolaire" in variables:
+            value = variables["AnneeScolaire"]
+            # Remplace toutes les variations possibles par la version avec guillemets
+            for fmt in [value, f"'{value}'", f'"{value}"']:
+                sql = sql.replace(fmt, "{AnneeScolaire}")
         if "codeperiexam" in variables:
             code = variables["codeperiexam"]
             sql = re.sub(r'codeperiexam\s*=\s*\d+', f'codeperiexam = {code}', sql)
             sql = re.sub(r"'?\d+'?\s*=\s*codeperiexam", f"'{code}' = codeperiexam", sql)
+            
+        keywords = ['SELECT', 'FROM', 'WHERE', 'JOIN', 'AND', 'OR']
+        protected = []
+        
         def protect(match):
             protected.append(match.group(0))
             return f"__PROTECTED_{len(protected)-1}__"
         
         temp_sql = re.sub('|'.join(keywords), protect, sql, flags=re.IGNORECASE)
         
-        # Remplacement des variables
         for param, value in variables.items():
             for fmt in [f"'{value}'", f'"{value}"', value]:
                 if fmt in temp_sql:
                     temp_sql = temp_sql.replace(fmt, f"{{{param}}}")
         
-        # Restauration des mots-clés
         for i, kw in enumerate(protected):
             temp_sql = temp_sql.replace(f'__PROTECTED_{i}__', kw)
             
@@ -148,21 +169,37 @@ class CacheManager:
 
     def get_cached_query(self, question: str) -> Optional[Tuple[str, Dict[str, str]]]:
         """Version compatible avec la détection automatique"""
+        # D'abord essayer la correspondance exacte
         normalized_question, variables = self._extract_parameters(question)
         key = self._generate_cache_key(normalized_question)
         
-        if key not in self.cache:
-            return None
-            
-        cached = self.cache[key]
+        if key in self.cache:
+            cached = self.cache[key]
+            current_vars = {}
+            for param in re.findall(r'\{(\w+)\}', cached['sql_template']):
+                if param in variables:
+                    current_vars[param] = variables[param]
+            return cached['sql_template'], current_vars
         
-        # Reconstruit les variables actuelles
-        current_vars = {}
-        for param in re.findall(r'\{(\w+)\}', cached['sql_template']):
-            if param in variables:
-                current_vars[param] = variables[param]
+        # Si pas de correspondance exacte, chercher un template similaire
+        similar_template, score = self.find_similar_template(question)
+        if similar_template:
+            print(f"🔍 Template similaire trouvé (score: {score:.2f})")
+            current_vars = {}
+            for param in re.findall(r'\{(\w+)\}', similar_template['sql_template']):
+                if param in variables:
+                    current_vars[param] = variables[param]
+                else:
+                    # Essaye de trouver une valeur correspondante dans la question
+                    for pattern in self.auto_patterns:
+                        match = re.search(pattern, question)
+                        if match:
+                            value = match.group(1) if len(match.groups()) > 0 else match.group(0)
+                            current_vars[param] = value
+                            break
+            return similar_template['sql_template'], current_vars
         
-        return cached['sql_template'], current_vars
+        return None
 
     def cache_query(self, question: str, sql_query: str):
         """Version finale de mise en cache"""
