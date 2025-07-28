@@ -1,0 +1,36 @@
+# Environnement virtuel
+venv/
+ENV/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de logs
+*.log
+
+# Fichiers d'environnement sensibles
+.env
+.env.*
+
+# Cache Python
+*.pyc
+*.pyo
+*.pyd
+
+# Dossiers de build
+build/
+dist/
+.eggs/
+
+# Fichiers IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
